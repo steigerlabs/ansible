@@ -1,0 +1,91 @@
+- hosts: localhost
+  name: ONTAP
+  gather_facts: false
+  collections:
+    - netapp.ontap
+  tasks:
+  - name: "Create SVM {{ src_svm }}"
+    na_ontap_svm:
+      state: present
+      name: "{{ src_svm }}"
+      root_volume: "svm_{{ src_svm }}_root"
+      hostname: "{{ src_cluster }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  - name: "Configure DNS for Domain {{ domainname }}"
+    na_ontap_dns:
+      state: present
+      vserver:  "{{ src_svm }}"
+      domains: "{{ domainname }}"
+      nameservers: "{{ nameserver }}"
+      skip_validation: true
+      hostname: "{{ src_cluster }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  - name: "Create {{ src_lifrole }} lif svm_{{ src_svm }}_data_LIF"
+    na_ontap_interface:
+      state: present
+      vserver: "{{ src_svm }}"
+      interface_name: "svm_{{ src_svm }}_data_LIF"
+      home_port: "{{ src_lifhomeport }}"
+      home_node: "{{ src_lifhomenode }}"
+      role: "{{ src_lifrole }}"
+      protocols: "{{ src_lifprotocol }}"
+      admin_status: up
+      is_auto_revert: true
+      address: "{{ src_lifaddress }}"
+      netmask: "{{ src_lifnetmask }}"
+      dns_domain_name: "{{ domainname }}"
+      hostname: "{{ src_cluster }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  - name: "Joining {{ src_svm }} to Domain {{ domainname }}"
+    na_ontap_cifs_server:
+      state: present
+      service_state: started
+      vserver: "{{ src_svm }}"
+      name: "{{ src_svm }}"
+      domain: "{{ domainname }}"
+      admin_user_name: "{{ ad_username }}"
+      admin_password: "{{ ad_password }}"
+      force: "yes"
+      hostname: "{{ src_cluster }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  - name: "Create Volume {{ volname }}"
+    na_ontap_volume:
+      state: present
+      name: "{{ volname }}"
+      size: "{{ volsize }}"
+      size_unit: "gb"
+      space_guarantee: none
+      aggregate_name: "{{ aggrname }}"
+      vserver: "{{ src_svm }}"
+      junction_path: "/{{ volname }}"
+      volume_security_style: ntfs
+      hostname: "{{ src_cluster }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+  - name: "Create CIFS share {{ src_lifaddress }} \\ {{ volname }}"
+    na_ontap_cifs:
+      state: present
+      share_name: "{{ volname }}"
+      path: "/{{ volname }}"
+      vserver: "{{ src_svm }}"
+      symlink_properties: read_only,enable
+      hostname: "{{ src_cluster }}"
+      username: "{{ netapp_username }}"
+      password: "{{ netapp_password }}"
+      https: true
+      validate_certs: false
+
